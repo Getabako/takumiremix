@@ -251,7 +251,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add docs/ output/
+          git add docs/
+          git add -f output/
           # TZ環境変数によりJSTで日付が出力される
           git diff --staged --quiet || git commit -m "Auto-generated: ${{ steps.config.outputs.topic }} - $(date +%Y-%m-%d)"
           git push
