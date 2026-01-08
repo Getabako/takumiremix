@@ -43,26 +43,32 @@ try:
 except ImportError:
     pass
 
-# Third-party imports
+# Third-party imports - all graceful to prevent sys.exit() killing the process
+GENAI_AVAILABLE = False
+PDF2IMAGE_AVAILABLE = False
+MOVIEPY_AVAILABLE = False
+PIL_AVAILABLE = False
+
 try:
     from google import genai
     from google.genai import types
+    GENAI_AVAILABLE = True
 except ImportError:
-    print("Error: google-generativeai not installed")
-    sys.exit(1)
+    print("Warning: google-genai not installed")
+    genai = None
+    types = None
 
 try:
     from pdf2image import convert_from_path
+    PDF2IMAGE_AVAILABLE = True
 except ImportError:
-    print("Error: pdf2image not installed")
-    sys.exit(1)
+    print("Warning: pdf2image not installed")
+    convert_from_path = None
 
-MOVIEPY_AVAILABLE = False
 try:
     from moviepy.editor import (
         ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
     )
-    # 警告抑制
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
     MOVIEPY_AVAILABLE = True
@@ -76,9 +82,16 @@ except ImportError:
 try:
     from PIL import Image, ImageDraw, ImageFont
     import numpy as np
+    PIL_AVAILABLE = True
 except ImportError:
-    print("Error: Pillow or numpy not installed")
-    sys.exit(1)
+    print("Warning: Pillow or numpy not installed")
+    Image = None
+    ImageDraw = None
+    ImageFont = None
+    np = None
+
+# Check if video generation is possible
+VIDEO_DEPS_AVAILABLE = GENAI_AVAILABLE and PDF2IMAGE_AVAILABLE and MOVIEPY_AVAILABLE and PIL_AVAILABLE
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -470,12 +483,21 @@ class VideoGeneratorV3:
         self.assembler = VideoAssembler(VideoConfig())
 
     async def generate(self, research_data: str, topic: str, topic_info: Dict, num_slides: int = 6) -> Dict:
-        # Check if moviepy is available
-        if not MOVIEPY_AVAILABLE:
-            logger.warning("moviepy not available, skipping video generation")
+        # Check if all video dependencies are available
+        if not VIDEO_DEPS_AVAILABLE:
+            missing = []
+            if not GENAI_AVAILABLE:
+                missing.append("google-genai")
+            if not PDF2IMAGE_AVAILABLE:
+                missing.append("pdf2image")
+            if not MOVIEPY_AVAILABLE:
+                missing.append("moviepy")
+            if not PIL_AVAILABLE:
+                missing.append("Pillow/numpy")
+            logger.warning(f"Video dependencies not available: {', '.join(missing)}, skipping video generation")
             return {
                 "status": "skipped",
-                "error": "moviepy not installed",
+                "error": f"Missing dependencies: {', '.join(missing)}",
                 "video_path": None,
                 "duration": 0,
                 "slides_count": 0,

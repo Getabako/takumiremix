@@ -7,9 +7,19 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: '生成するトピック（空白で自動選択）'
+        description: '生成するトピック'
         required: false
-        type: string
+        type: choice
+        options:
+          - 'auto'
+          - 'ai_tools'
+          - 'psychology'
+          - 'education'
+          - 'startup'
+          - 'investment'
+          - 'inclusive_education'
+          - 'weekly_summary'
+        default: 'auto'
       research_method:
         description: 'リサーチ方法を選択'
         required: false
@@ -157,10 +167,9 @@ jobs:
       - name: Determine today's topic and research method
         id: config
         run: |
-          # トピックの決定
-          if [ -n "${{ github.event.inputs.topic }}" ]; then
-            echo "topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
-          else
+          # トピックの決定（auto または 空白 の場合は曜日で自動選択）
+          SELECTED_TOPIC="${{ github.event.inputs.topic }}"
+          if [ "$SELECTED_TOPIC" = "auto" ] || [ -z "$SELECTED_TOPIC" ]; then
             python -c "
           import sys
           sys.path.insert(0, 'src')
@@ -179,6 +188,8 @@ jobs:
           else:
               print('topic=ai_tools')
             " >> $GITHUB_OUTPUT
+          else
+            echo "topic=$SELECTED_TOPIC" >> $GITHUB_OUTPUT
           fi
 
           # リサーチ方法の決定
