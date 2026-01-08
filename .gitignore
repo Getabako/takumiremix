@@ -24,9 +24,8 @@ yarn-error.log
 *.swp
 *.swo
 
-# Output (optional - remove if you want to track generated content)
-# output/posts/*
-# output/images/*
+# Output
+output/
 
 # OS
 .DS_Store

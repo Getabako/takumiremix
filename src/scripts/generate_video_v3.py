@@ -57,6 +57,7 @@ except ImportError:
     print("Error: pdf2image not installed")
     sys.exit(1)
 
+MOVIEPY_AVAILABLE = False
 try:
     from moviepy.editor import (
         ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
@@ -64,9 +65,13 @@ try:
     # 警告抑制
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
+    MOVIEPY_AVAILABLE = True
 except ImportError:
-    print("Error: moviepy not installed")
-    sys.exit(1)
+    print("Warning: moviepy not installed, video generation will be skipped")
+    ImageClip = None
+    AudioFileClip = None
+    CompositeVideoClip = None
+    concatenate_videoclips = None
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -465,10 +470,22 @@ class VideoGeneratorV3:
         self.assembler = VideoAssembler(VideoConfig())
 
     async def generate(self, research_data: str, topic: str, topic_info: Dict, num_slides: int = 6) -> Dict:
+        # Check if moviepy is available
+        if not MOVIEPY_AVAILABLE:
+            logger.warning("moviepy not available, skipping video generation")
+            return {
+                "status": "skipped",
+                "error": "moviepy not installed",
+                "video_path": None,
+                "duration": 0,
+                "slides_count": 0,
+                "title": ""
+            }
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = Path(__file__).parent.parent.parent / "output" / "videos" / f"{timestamp}_{topic}"
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info("Step 1: Marp Generation")
         marp_res = await self.marp_gen.generate(research_data, topic, topic_info, num_slides)
         raw_md = marp_res["markdown"]

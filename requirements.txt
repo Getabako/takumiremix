@@ -39,4 +39,7 @@ pytest-asyncio>=0.21.0
 
 # Video Generation
 moviepy>=1.0.3
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.8
+decorator>=4.4.2
 pdf2image>=1.16.3
