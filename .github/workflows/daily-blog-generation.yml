@@ -202,7 +202,9 @@ jobs:
         id: generate
         env:
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        shell: bash
         run: |
+          set -o pipefail
           echo "Research Method: ${{ steps.config.outputs.research_display }}"
           echo "Skip Video: ${{ github.event.inputs.skip_video }}"
           cd src/scripts
@@ -251,8 +253,18 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+
+          # Add docs directory
           git add docs/
-          git add -f output/
+
+          # Add output directory only if it exists and has files
+          if [ -d "output" ] && [ "$(ls -A output 2>/dev/null)" ]; then
+            git add -f output/
+            echo "Added output/ directory"
+          else
+            echo "output/ directory is empty or does not exist, skipping"
+          fi
+
           # TZ環境変数によりJSTで日付が出力される
           git diff --staged --quiet || git commit -m "Auto-generated: ${{ steps.config.outputs.topic }} - $(date +%Y-%m-%d)"
           git push
