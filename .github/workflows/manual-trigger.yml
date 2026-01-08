@@ -1,0 +1,45 @@
+name: Manual Blog Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'トピックを選択'
+        required: true
+        type: choice
+        options:
+          - psychology
+          - education
+          - startup
+          - investment
+          - ai_tools
+          - inclusive_education
+          - weekly_summary
+      research_method:
+        description: 'リサーチ方法を選択（weekly_summaryは常にDeep Research）'
+        required: true
+        type: choice
+        options:
+          - 'multi_search'
+          - 'deep_research'
+        default: 'multi_search'
+      skip_images:
+        description: '画像生成をスキップ'
+        required: false
+        type: boolean
+        default: false
+      skip_video:
+        description: '動画生成をスキップ'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  generate:
+    uses: ./.github/workflows/daily-blog-generation.yml
+    with:
+      topic: ${{ inputs.topic }}
+      research_method: ${{ inputs.topic == 'weekly_summary' && 'deep_research' || inputs.research_method }}
+      skip_images: ${{ inputs.skip_images }}
+      skip_video: ${{ inputs.skip_video }}
+    secrets: inherit

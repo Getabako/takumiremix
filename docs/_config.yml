@@ -1,0 +1,47 @@
+# Jekyll Configuration for if(塾) Blog
+title: if(塾) Blog
+description: 教育・心理学・テクノロジーに関する最新情報を、科学的根拠に基づいてお届けします。
+url: "https://takubon0202.github.io"
+baseurl: "/if-blog-auto"
+
+# Timezone - 日本標準時 (JST)
+timezone: Asia/Tokyo
+
+# Author
+author:
+  name: if(塾)
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+permalink: /:year/:month/:day/:title/
+
+# Plugins (GitHub Pages supported)
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      author: "AI Blog Generator"
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - README.md
+
+# Japanese language settings
+lang: ja
+
+# SEO
+twitter:
+  card: summary

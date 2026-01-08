@@ -1,0 +1,340 @@
+name: Daily Blog Generation with Gemini
+
+on:
+  schedule:
+    # 毎日日本時間午前5時に実行（UTC 20:00）
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: '生成するトピック（空白で自動選択）'
+        required: false
+        type: string
+      research_method:
+        description: 'リサーチ方法を選択'
+        required: false
+        type: choice
+        options:
+          - 'auto'
+          - 'google_search'
+          - 'deep_research'
+        default: 'auto'
+      skip_images:
+        description: '画像生成をスキップ'
+        required: false
+        type: boolean
+        default: false
+      skip_video:
+        description: '動画生成をスキップ'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+  TZ: 'Asia/Tokyo'  # 日本標準時 (JST)
+
+jobs:
+  generate-blog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # 動画生成のため延長
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+# Removed Remotion setup, but Node.js is needed for Marp
+      - name: Setup Node.js for Marp
+        if: ${{ github.event.inputs.skip_video != 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+
+      - name: Install system dependencies for video generation
+        if: ${{ github.event.inputs.skip_video != 'true' }}
+        run: |
+          sudo apt-get update
+          # Chrome/Puppeteer dependencies + Marp/pdf2image dependencies
+          sudo apt-get install -y \
+            libnss3 \
+            libnspr4 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2t64 \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            libcairo2 \
+            libatspi2.0-0 \
+            libgtk-3-0 \
+            libgdk-pixbuf-2.0-0 \
+            libx11-xcb1 \
+            libxcb-dri3-0 \
+            libxshmfence1 \
+            fonts-liberation \
+            fonts-noto-cjk \
+            xvfb \
+            libegl1 \
+            libgl1-mesa-dri \
+            libglx-mesa0 \
+            mesa-utils \
+            poppler-utils \
+            ffmpeg
+          echo "System dependencies installed successfully"
+
+      - name: Install Marp CLI
+        if: ${{ github.event.inputs.skip_video != 'true' }}
+        run: |
+          npm install -g @marp-team/marp-cli
+          marp --version
+          echo "Marp CLI installed successfully"
+
+      - name: Start Xvfb for headless rendering
+        if: ${{ github.event.inputs.skip_video != 'true' }}
+        run: |
+          # Kill any existing Xvfb processes
+          pkill Xvfb || true
+
+          # Start Xvfb with proper settings
+          Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &
+          XVFB_PID=$!
+          echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
+
+          # Set DISPLAY immediately
+          export DISPLAY=:99
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+          # Wait for Xvfb to be ready
+          sleep 3
+
+          # Verify Xvfb is running
+          if ps -p $XVFB_PID > /dev/null 2>&1; then
+            echo "Xvfb started successfully (PID: $XVFB_PID)"
+          else
+            echo "WARNING: Xvfb may not have started correctly"
+          fi
+
+          # Test display (non-fatal if fails)
+          if command -v xdpyinfo &> /dev/null; then
+            xdpyinfo -display :99 > /dev/null 2>&1 && echo "Display :99 verified" || echo "Display verification skipped"
+          else
+            echo "xdpyinfo not available, skipping display verification"
+          fi
+
+          echo "Xvfb setup complete"
+
+
+      - name: Determine today's topic and research method
+        id: config
+        run: |
+          # トピックの決定
+          if [ -n "${{ github.event.inputs.topic }}" ]; then
+            echo "topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
+          else
+            python -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from lib.timezone import get_weekday_name_jst
+          import json
+
+          with open('src/config/topics.json') as f:
+              config = json.load(f)
+
+          # JST基準で曜日を取得
+          today = get_weekday_name_jst()
+          topics = config['rotation_schedule'].get(today, [])
+
+          if topics:
+              print(f'topic={topics[0]}')
+          else:
+              print('topic=ai_tools')
+            " >> $GITHUB_OUTPUT
+          fi
+
+          # リサーチ方法の決定
+          # auto: 日曜日のみDeep Research、それ以外はGoogle Search
+          # google_search: 常にGoogle Search
+          # deep_research: 常にDeep Research
+          RESEARCH_METHOD="${{ github.event.inputs.research_method }}"
+          if [ "$RESEARCH_METHOD" = "deep_research" ]; then
+            echo "use_deep_research=true" >> $GITHUB_OUTPUT
+            echo "research_display=Deep Research (手動指定)" >> $GITHUB_OUTPUT
+          elif [ "$RESEARCH_METHOD" = "google_search" ]; then
+            echo "use_deep_research=false" >> $GITHUB_OUTPUT
+            echo "research_display=Google Search (手動指定)" >> $GITHUB_OUTPUT
+          else
+            # auto: 日曜日のみDeep Research
+            DAY_OF_WEEK=$(date +%u)  # 1=Mon, 7=Sun
+            if [ "$DAY_OF_WEEK" = "7" ]; then
+              echo "use_deep_research=true" >> $GITHUB_OUTPUT
+              echo "research_display=Deep Research (日曜日自動)" >> $GITHUB_OUTPUT
+            else
+              echo "use_deep_research=false" >> $GITHUB_OUTPUT
+              echo "research_display=Google Search (デフォルト)" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Generate blog post
+        id: generate
+        env:
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        run: |
+          echo "Research Method: ${{ steps.config.outputs.research_display }}"
+          echo "Skip Video: ${{ github.event.inputs.skip_video }}"
+          cd src/scripts
+          python main.py \
+            --topic "${{ steps.config.outputs.topic }}" \
+            ${{ steps.config.outputs.use_deep_research == 'true' && '--use-deep-research' || '' }} \
+            ${{ github.event.inputs.skip_images == 'true' && '--skip-images' || '' }} \
+            ${{ github.event.inputs.skip_video == 'true' && '--skip-video' || '' }} \
+            --publish 2>&1 | tee generation.log
+
+      - name: Analyze errors on failure
+        if: failure()
+        run: |
+          echo "## Error Analysis Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Error Log (last 100 lines)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 src/scripts/generation.log 2>/dev/null || echo "No log file found"
+          tail -100 src/scripts/generation.log >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Common error patterns analysis
+          echo "### Detected Issues" >> $GITHUB_STEP_SUMMARY
+          if grep -q "libasound" src/scripts/generation.log 2>/dev/null; then
+            echo "- Audio library issue (libasound)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "Target closed" src/scripts/generation.log 2>/dev/null; then
+            echo "- Browser/Puppeteer crashed (Target closed)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "GOOGLE_AI_API_KEY" src/scripts/generation.log 2>/dev/null; then
+            echo "- API key issue" >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "rate limit" src/scripts/generation.log 2>/dev/null; then
+            echo "- Rate limit exceeded" >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "timeout" src/scripts/generation.log 2>/dev/null; then
+            echo "- Timeout error" >> $GITHUB_STEP_SUMMARY
+          fi
+          if grep -q "ModuleNotFoundError\|ImportError" src/scripts/generation.log 2>/dev/null; then
+            echo "- Python module import error" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Commit and push generated content
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add docs/ output/
+          # TZ環境変数によりJSTで日付が出力される
+          git diff --staged --quiet || git commit -m "Auto-generated: ${{ steps.config.outputs.topic }} - $(date +%Y-%m-%d)"
+          git push
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-blog-${{ steps.config.outputs.topic }}-${{ github.run_number }}
+          path: |
+            output/
+            docs/_posts/
+          retention-days: 30
+
+      - name: Create summary
+        run: |
+          echo "## Blog Generation Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Topic**: ${{ steps.config.outputs.topic }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Research Method**: ${{ steps.config.outputs.research_display }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Skip Images**: ${{ github.event.inputs.skip_images == 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Skip Video**: ${{ github.event.inputs.skip_video == 'true' }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.config.outputs.topic }}" = "weekly_summary" ]; then
+            echo "- **Type**: 週間総括記事 (Deep Research)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Content" >> $GITHUB_STEP_SUMMARY
+          echo "- Blog post (Markdown)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.skip_images }}" != "true" ]; then
+            echo "- Hero image (PNG)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.skip_video }}" != "true" ]; then
+            echo "- Standard video (30s, 1920x1080)" >> $GITHUB_STEP_SUMMARY
+            echo "- Short video (15s, 1080x1920)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Published URL" >> $GITHUB_STEP_SUMMARY
+          echo "https://takubon0202.github.io/if-blog-auto/" >> $GITHUB_STEP_SUMMARY
+
+  # GitHub Pagesへのデプロイ
+  deploy-pages:
+    needs: generate-blog
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout latest commit
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Pull latest changes
+        run: git pull origin main
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          working-directory: ./docs
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build with Jekyll
+        run: |
+          cd docs
+          bundle exec jekyll build --destination ../_site --baseurl "/if-blog-auto"
+        env:
+          JEKYLL_ENV: production
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

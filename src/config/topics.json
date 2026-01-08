@@ -1,0 +1,78 @@
+{
+  "topics": [
+    {
+      "id": "psychology",
+      "name": "心理学・メンタルヘルス",
+      "keywords": ["心理学", "メンタルヘルス", "カウンセリング", "認知行動療法", "マインドフルネス", "ストレス管理"],
+      "research_focus": ["最新研究", "実践テクニック", "専門家の見解"],
+      "target_audience": "ストレスや心の健康に関心のある20-50代",
+      "priority": 1,
+      "frequency": "weekly"
+    },
+    {
+      "id": "education",
+      "name": "教育・学習科学",
+      "keywords": ["教育", "学習法", "EdTech", "オンライン学習", "教育改革", "学習科学"],
+      "research_focus": ["教育テクノロジー", "学習効率", "教育政策"],
+      "target_audience": "教育関係者、保護者、学習者",
+      "priority": 1,
+      "frequency": "weekly"
+    },
+    {
+      "id": "startup",
+      "name": "起業家育成・スタートアップ",
+      "keywords": ["起業", "スタートアップ", "起業家精神", "ビジネスモデル", "資金調達", "アントレプレナーシップ"],
+      "research_focus": ["成功事例", "失敗からの学び", "最新トレンド"],
+      "target_audience": "起業を考えている人、経営者、ビジネスパーソン",
+      "priority": 2,
+      "frequency": "weekly"
+    },
+    {
+      "id": "investment",
+      "name": "投資教育・金融リテラシー",
+      "keywords": ["投資教育", "金融リテラシー", "資産形成", "NISA", "投資信託", "株式投資"],
+      "research_focus": ["制度変更", "投資戦略", "リスク管理"],
+      "target_audience": "投資初心者、資産形成に関心のある社会人",
+      "priority": 2,
+      "frequency": "weekly"
+    },
+    {
+      "id": "ai_tools",
+      "name": "AIツール・技術動向",
+      "keywords": ["AI", "ChatGPT", "生成AI", "AIツール", "機械学習", "Claude", "Gemini"],
+      "research_focus": ["新サービス", "活用事例", "技術動向"],
+      "target_audience": "AIに関心のあるビジネスパーソン、クリエイター",
+      "priority": 1,
+      "frequency": "weekly"
+    },
+    {
+      "id": "inclusive_education",
+      "name": "インクルーシブ教育・多様な学び",
+      "keywords": ["不登校", "発達障害", "ADHD", "ASD", "フリースクール", "オルタナティブ教育", "ニューロダイバーシティ", "合理的配慮", "インクルーシブ", "学習障害", "ホームスクーリング"],
+      "research_focus": ["支援制度", "成功事例", "専門家の見解", "当事者の声", "最新研究"],
+      "target_audience": "不登校・発達障害の子を持つ保護者、教育関係者、支援者、当事者",
+      "priority": 1,
+      "frequency": "weekly"
+    },
+    {
+      "id": "weekly_summary",
+      "name": "週間トレンド総括",
+      "keywords": ["心理学", "教育", "起業", "投資", "AI", "インクルーシブ教育", "週間まとめ", "トレンド分析"],
+      "research_focus": ["1週間の重要ニュース", "トピック横断的な分析", "来週の注目ポイント"],
+      "target_audience": "幅広い読者層、1週間の動向を把握したい人",
+      "priority": 1,
+      "frequency": "weekly",
+      "is_summary": true,
+      "summary_topics": ["psychology", "education", "startup", "investment", "ai_tools", "inclusive_education"]
+    }
+  ],
+  "rotation_schedule": {
+    "monday": ["psychology"],
+    "tuesday": ["education"],
+    "wednesday": ["startup"],
+    "thursday": ["investment"],
+    "friday": ["ai_tools"],
+    "saturday": ["inclusive_education"],
+    "sunday": ["weekly_summary"]
+  }
+}

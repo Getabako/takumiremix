@@ -1,0 +1,327 @@
+---
+layout: default
+---
+<!-- Hero Section -->
+<section class="home-hero">
+  <div class="wrapper">
+    <h1>if(塾) Blog</h1>
+    <p class="lead">教育・心理学・テクノロジーに関する最新情報を、<br>科学的根拠に基づいてお届けします。</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-number">{{ site.posts | size }}</span>
+        <span class="hero-stat-label">Articles</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-number">7</span>
+        <span class="hero-stat-label">Categories</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-number">Weekly</span>
+        <span class="hero-stat-label">Updates</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main Content -->
+<div class="page-content">
+  <div class="wrapper">
+
+    <!-- Featured Post -->
+    {% assign latest_post = site.posts | first %}
+    {% if latest_post %}
+    <section class="featured-section">
+      <h2 class="section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        Featured
+      </h2>
+      <a href="{{ latest_post.url | relative_url }}" class="post-card featured">
+        {% if latest_post.featured_image %}
+        <div class="post-card-image">
+          <img src="{{ latest_post.featured_image | relative_url }}" alt="{{ latest_post.title }}" loading="lazy">
+        </div>
+        {% endif %}
+        <div class="post-card-content">
+          <div class="post-card-meta">
+            <time class="post-card-date" datetime="{{ latest_post.date | date_to_xmlschema }}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              {{ latest_post.date | date: "%Y.%m.%d" }}
+            </time>
+            {% if latest_post.categories.size > 0 %}
+              <span class="post-card-category">{{ latest_post.categories | first }}</span>
+            {% endif %}
+          </div>
+          <h3 class="post-card-title">{{ latest_post.title | escape }}</h3>
+          {% if latest_post.description %}
+            <p class="post-card-excerpt">{{ latest_post.description | truncate: 200 }}</p>
+          {% elsif latest_post.excerpt %}
+            <p class="post-card-excerpt">{{ latest_post.excerpt | strip_html | truncate: 200 }}</p>
+          {% endif %}
+          <div class="post-card-footer">
+            <span class="post-card-read-more">
+              続きを読む
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </a>
+    </section>
+    {% endif %}
+
+    <!-- Recent Posts -->
+    <section class="recent-section">
+      <h2 class="section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Recent Articles
+      </h2>
+
+      <ul class="post-list">
+        {% for post in site.posts offset:1 limit:6 %}
+          <li>
+            <a href="{{ post.url | relative_url }}" class="post-card">
+              <div class="post-card-content">
+                <div class="post-card-meta">
+                  <time class="post-card-date" datetime="{{ post.date | date_to_xmlschema }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    {{ post.date | date: "%Y.%m.%d" }}
+                  </time>
+                  {% if post.categories.size > 0 %}
+                    <span class="post-card-category">{{ post.categories | first }}</span>
+                  {% endif %}
+                </div>
+                <h3 class="post-card-title">{{ post.title | escape }}</h3>
+                {% if post.description %}
+                  <p class="post-card-excerpt">{{ post.description | truncate: 140 }}</p>
+                {% elsif post.excerpt %}
+                  <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 140 }}</p>
+                {% endif %}
+                <div class="post-card-footer">
+                  <span class="post-card-read-more">
+                    続きを読む
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                  </span>
+                </div>
+              </div>
+              {% if post.featured_image %}
+              <div class="post-card-image">
+                <img src="{{ post.featured_image | relative_url }}" alt="{{ post.title }}" loading="lazy">
+              </div>
+              {% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if site.posts.size > 7 %}
+      <p class="view-all">
+        <a href="{{ '/archive' | relative_url }}" class="btn-view-all">
+          すべての記事を見る
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </a>
+      </p>
+      {% endif %}
+    </section>
+
+    <!-- Categories Section -->
+    <section class="categories-section">
+      <h2 class="section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Categories
+      </h2>
+      <div class="category-cards">
+        <a href="{{ '/categories' | relative_url }}#psychology" class="category-pill cat-psychology">
+          <span class="cat-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 16a6 6 0 1 1 6-6 6 6 0 0 1-6 6z"></path>
+            </svg>
+          </span>
+          <span class="cat-name">心理学</span>
+        </a>
+        <a href="{{ '/categories' | relative_url }}#education" class="category-pill cat-education">
+          <span class="cat-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+            </svg>
+          </span>
+          <span class="cat-name">教育</span>
+        </a>
+        <a href="{{ '/categories' | relative_url }}#startup" class="category-pill cat-startup">
+          <span class="cat-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </span>
+          <span class="cat-name">起業</span>
+        </a>
+        <a href="{{ '/categories' | relative_url }}#ai" class="category-pill cat-ai">
+          <span class="cat-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+              <rect x="9" y="9" width="6" height="6"></rect>
+              <line x1="9" y1="1" x2="9" y2="4"></line>
+              <line x1="15" y1="1" x2="15" y2="4"></line>
+              <line x1="9" y1="20" x2="9" y2="23"></line>
+              <line x1="15" y1="20" x2="15" y2="23"></line>
+            </svg>
+          </span>
+          <span class="cat-name">AI</span>
+        </a>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<style>
+/* Category Pills */
+.categories-section {
+  margin-top: var(--space-16);
+}
+
+.category-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.category-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-fast);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.category-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.cat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+}
+
+.cat-psychology .cat-icon { background: rgba(49, 130, 206, 0.1); color: #3182ce; }
+.cat-psychology:hover { border-color: #3182ce; color: #3182ce; }
+
+.cat-education .cat-icon { background: rgba(56, 161, 105, 0.1); color: #38a169; }
+.cat-education:hover { border-color: #38a169; color: #38a169; }
+
+.cat-startup .cat-icon { background: rgba(221, 107, 32, 0.1); color: #dd6b20; }
+.cat-startup:hover { border-color: #dd6b20; color: #dd6b20; }
+
+.cat-ai .cat-icon { background: rgba(8, 145, 178, 0.1); color: #0891b2; }
+.cat-ai:hover { border-color: #0891b2; color: #0891b2; }
+
+/* Featured Section */
+.featured-section {
+  margin-bottom: var(--space-16);
+}
+
+.featured-section .post-card {
+  grid-template-columns: 1fr;
+}
+
+.featured-section .post-card-image {
+  height: 320px;
+}
+
+.featured-section .post-card-title {
+  font-size: var(--text-2xl);
+}
+
+/* View All Button */
+.btn-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-8);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.btn-view-all:hover {
+  background: var(--color-primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-inverse);
+}
+
+.btn-view-all svg {
+  transition: transform var(--transition-fast);
+}
+
+.btn-view-all:hover svg {
+  transform: translateX(4px);
+}
+
+.view-all {
+  text-align: center;
+  margin-top: var(--space-12);
+}
+
+/* Recent Section */
+.recent-section {
+  margin-top: var(--space-12);
+}
+
+@media (max-width: 768px) {
+  .category-cards {
+    flex-direction: column;
+  }
+
+  .category-pill {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .featured-section .post-card-image {
+    height: 200px;
+  }
+}
+</style>

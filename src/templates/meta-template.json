@@ -1,0 +1,36 @@
+{
+  "title": {
+    "max_length": 60,
+    "template": "{keyword} - {topic} | ブログ名",
+    "required": true
+  },
+  "description": {
+    "max_length": 120,
+    "template": "{summary}。詳しくはこちら。",
+    "required": true
+  },
+  "og": {
+    "title": "{title}",
+    "description": "{description}",
+    "image": "{featured_image}",
+    "type": "article"
+  },
+  "twitter": {
+    "card": "summary_large_image",
+    "title": "{title}",
+    "description": "{description}",
+    "image": "{featured_image}"
+  },
+  "schema": {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "{title}",
+    "description": "{description}",
+    "image": "{featured_image}",
+    "datePublished": "{date}",
+    "author": {
+      "@type": "Organization",
+      "name": "AI Blog Generator"
+    }
+  }
+}

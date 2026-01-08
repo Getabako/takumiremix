@@ -1,0 +1,26 @@
+{
+  "name": "blog-automation",
+  "version": "2.0.0",
+  "description": "Automated blog generation with Gemini API",
+  "main": "src/lib/gemini_client.js",
+  "scripts": {
+    "generate": "node src/scripts/main.js",
+    "dashboard": "cd dashboard && python api/server.py",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@google/genai": "^0.5.0",
+    "marked": "^12.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "blog",
+    "automation",
+    "gemini",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,68 @@
+{
+  "gemini": {
+    "models": {
+      "content_generation": "gemini-3-pro-preview",
+      "seo_optimization": "gemini-3-flash-preview",
+      "quality_review": "gemini-3-flash-preview",
+      "quick_tasks": "gemini-3-flash-preview",
+      "deep_research": "deep-research-pro-preview-12-2025",
+      "image_generation": "gemini-2.5-flash-image"
+    },
+    "settings": {
+      "temperature": 0.7,
+      "max_output_tokens": 8192,
+      "enable_search_by_default": true,
+      "research_timeout_seconds": 300,
+      "research_poll_interval": 10,
+      "thinking_mode": false
+    }
+  },
+  "blog": {
+    "min_word_count": 1500,
+    "max_word_count": 4000,
+    "default_language": "ja",
+    "default_tone": "professional_friendly",
+    "images_per_post": 2,
+    "required_sources": 3
+  },
+  "seo": {
+    "min_score": 75,
+    "title_max_length": 60,
+    "meta_description_max_length": 120,
+    "keyword_density": {
+      "min": 1.5,
+      "max": 3.0
+    }
+  },
+  "publishing": {
+    "auto_publish": true,
+    "review_required": true,
+    "default_status": "published",
+    "platforms": ["github_pages"],
+    "schedule_posts": true,
+    "github_pages": {
+      "repository": "takubon0202/if-blog-auto",
+      "branch": "main",
+      "source_dir": "docs",
+      "base_url": "https://takubon0202.github.io/if-blog-auto"
+    }
+  },
+  "quality": {
+    "min_quality_score": 75,
+    "factcheck_required": true,
+    "grammar_check": true,
+    "plagiarism_check": false
+  },
+  "schedule": {
+    "timezone": "Asia/Tokyo",
+    "research_time": "05:00",
+    "generation_time": "06:00",
+    "review_time": "08:00",
+    "publish_time": "09:00"
+  },
+  "rate_limits": {
+    "gemini_rpm": 60,
+    "imagen_rpd": 100,
+    "deep_research_concurrent": 3
+  }
+}

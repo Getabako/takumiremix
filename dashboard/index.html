@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブログ自動生成ダッシュボード</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>ブログ自動生成システム</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary" onclick="refreshDashboard()">
+                    <span>🔄</span> 更新
+                </button>
+                <div class="user-info">
+                    <span class="user-name">管理者</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <a href="#overview" class="nav-item active" data-tab="overview">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">概要</span>
+                </a>
+                <a href="#generate" class="nav-item" data-tab="generate">
+                    <span class="nav-icon">✨</span>
+                    <span class="nav-label">新規生成</span>
+                </a>
+                <a href="#articles" class="nav-item" data-tab="articles">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-label">記事一覧</span>
+                </a>
+                <a href="#schedule" class="nav-item" data-tab="schedule">
+                    <span class="nav-icon">📅</span>
+                    <span class="nav-label">スケジュール</span>
+                </a>
+                <a href="#analytics" class="nav-item" data-tab="analytics">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">分析</span>
+                </a>
+                <a href="#settings" class="nav-item" data-tab="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">設定</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <h2>ダッシュボード概要</h2>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-icon">📝</span>
+                            <span class="stat-label">生成済み記事</span>
+                        </div>
+                        <div class="stat-value" id="totalArticles">0</div>
+                        <div class="stat-change positive">+5 今月</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-icon">✅</span>
+                            <span class="stat-label">公開済み</span>
+                        </div>
+                        <div class="stat-value" id="publishedArticles">0</div>
+                        <div class="stat-change positive">+3 今月</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-icon">⏳</span>
+                            <span class="stat-label">下書き</span>
+                        </div>
+                        <div class="stat-value" id="draftArticles">0</div>
+                        <div class="stat-change">2 件</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-icon">📅</span>
+                            <span class="stat-label">予約投稿</span>
+                        </div>
+                        <div class="stat-value" id="scheduledArticles">0</div>
+                        <div class="stat-change">次回: 明日</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card">
+                    <h3>最近のアクティビティ</h3>
+                    <div class="activity-list" id="activityList">
+                        <!-- Activity items will be dynamically loaded -->
+                        <div class="activity-item">
+                            <span class="activity-icon">✨</span>
+                            <div class="activity-content">
+                                <div class="activity-title">新しい記事を生成しました</div>
+                                <div class="activity-time">2時間前</div>
+                            </div>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-icon">📤</span>
+                            <div class="activity-content">
+                                <div class="activity-title">記事を公開しました</div>
+                                <div class="activity-time">5時間前</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h3>クイックアクション</h3>
+                    <div class="quick-actions">
+                        <button class="btn btn-primary" onclick="switchTab('generate')">
+                            ✨ 新しい記事を生成
+                        </button>
+                        <button class="btn btn-secondary" onclick="switchTab('articles')">
+                            📝 記事を管理
+                        </button>
+                        <button class="btn btn-secondary" onclick="switchTab('schedule')">
+                            📅 スケジュールを確認
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Tab -->
+            <div id="generate" class="tab-content">
+                <h2>新規記事生成</h2>
+
+                <div class="card">
+                    <h3>記事生成フォーム</h3>
+                    <form id="generateForm" onsubmit="generateArticle(event)">
+                        <div class="form-group">
+                            <label for="topic">トピック</label>
+                            <input type="text" id="topic" name="topic" placeholder="記事のトピックを入力" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category">カテゴリー</label>
+                            <select id="category" name="category" required>
+                                <option value="">選択してください</option>
+                                <option value="technology">テクノロジー</option>
+                                <option value="business">ビジネス</option>
+                                <option value="lifestyle">ライフスタイル</option>
+                                <option value="education">教育</option>
+                                <option value="health">健康</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="keywords">キーワード（カンマ区切り）</label>
+                            <input type="text" id="keywords" name="keywords" placeholder="例: AI, 機械学習, Python">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tone">トーン</label>
+                            <select id="tone" name="tone">
+                                <option value="professional">プロフェッショナル</option>
+                                <option value="casual">カジュアル</option>
+                                <option value="educational">教育的</option>
+                                <option value="enthusiastic">熱意のある</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="length">記事の長さ</label>
+                            <select id="length" name="length">
+                                <option value="short">短い（500-800語）</option>
+                                <option value="medium" selected>中程度（800-1500語）</option>
+                                <option value="long">長い（1500-2500語）</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="includeImages" name="includeImages" checked>
+                                <span>画像を含める</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="autoPublish" name="autoPublish">
+                                <span>生成後に自動公開</span>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">生成開始</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetForm()">リセット</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Generation Progress -->
+                <div id="generationProgress" class="card" style="display: none;">
+                    <h3>生成中...</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                    <div class="progress-status" id="progressStatus">準備中...</div>
+                </div>
+
+                <!-- Generation Result -->
+                <div id="generationResult" class="card" style="display: none;">
+                    <h3>生成結果</h3>
+                    <div class="result-preview" id="resultPreview">
+                        <!-- Preview will be loaded here -->
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="publishArticle()">公開する</button>
+                        <button class="btn btn-secondary" onclick="saveDraft()">下書き保存</button>
+                        <button class="btn btn-secondary" onclick="editArticle()">編集する</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Articles Tab -->
+            <div id="articles" class="tab-content">
+                <h2>記事一覧</h2>
+
+                <div class="card">
+                    <div class="table-controls">
+                        <div class="search-box">
+                            <input type="text" id="searchArticles" placeholder="記事を検索..." onkeyup="filterArticles()">
+                        </div>
+                        <div class="filter-controls">
+                            <select id="statusFilter" onchange="filterArticles()">
+                                <option value="">すべてのステータス</option>
+                                <option value="published">公開済み</option>
+                                <option value="draft">下書き</option>
+                                <option value="scheduled">予約投稿</option>
+                            </select>
+                            <select id="categoryFilter" onchange="filterArticles()">
+                                <option value="">すべてのカテゴリー</option>
+                                <option value="technology">テクノロジー</option>
+                                <option value="business">ビジネス</option>
+                                <option value="lifestyle">ライフスタイル</option>
+                                <option value="education">教育</option>
+                                <option value="health">健康</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>タイトル</th>
+                                    <th>カテゴリー</th>
+                                    <th>ステータス</th>
+                                    <th>作成日</th>
+                                    <th>公開日</th>
+                                    <th>アクション</th>
+                                </tr>
+                            </thead>
+                            <tbody id="articlesTableBody">
+                                <!-- Articles will be dynamically loaded -->
+                                <tr>
+                                    <td colspan="6" class="no-data">記事がありません</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pagination">
+                        <button class="btn btn-small" onclick="previousPage()">前へ</button>
+                        <span id="pageInfo">ページ 1 / 1</span>
+                        <button class="btn btn-small" onclick="nextPage()">次へ</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule Tab -->
+            <div id="schedule" class="tab-content">
+                <h2>投稿スケジュール</h2>
+
+                <div class="card">
+                    <h3>カレンダービュー</h3>
+                    <div id="calendar" class="calendar">
+                        <!-- Calendar will be dynamically generated -->
+                        <div class="calendar-header">
+                            <button class="btn btn-small" onclick="previousMonth()">←</button>
+                            <h4 id="currentMonth">2024年1月</h4>
+                            <button class="btn btn-small" onclick="nextMonth()">→</button>
+                        </div>
+                        <div class="calendar-grid" id="calendarGrid">
+                            <!-- Calendar grid will be generated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>予定一覧</h3>
+                    <div class="schedule-list" id="scheduleList">
+                        <!-- Scheduled posts will be listed here -->
+                        <div class="schedule-item">
+                            <div class="schedule-date">2024-01-15 10:00</div>
+                            <div class="schedule-title">AIの最新トレンド2024</div>
+                            <div class="schedule-actions">
+                                <button class="btn btn-small btn-secondary">編集</button>
+                                <button class="btn btn-small btn-danger">削除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics" class="tab-content">
+                <h2>分析・統計</h2>
+
+                <div class="card">
+                    <h3>記事生成トレンド</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="card">
+                        <h3>カテゴリー別分布</h3>
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+
+                    <div class="card">
+                        <h3>ステータス別分布</h3>
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>パフォーマンス指標</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-item">
+                            <div class="metric-label">平均生成時間</div>
+                            <div class="metric-value">2.5分</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">成功率</div>
+                            <div class="metric-value">98.5%</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">月間生成数</div>
+                            <div class="metric-value">45件</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">総文字数</div>
+                            <div class="metric-value">125,000</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <h2>設定</h2>
+
+                <div class="card">
+                    <h3>API設定</h3>
+                    <form id="apiSettingsForm">
+                        <div class="form-group">
+                            <label for="claudeApiKey">Claude API Key</label>
+                            <input type="password" id="claudeApiKey" name="claudeApiKey" placeholder="sk-...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="bloggerApiKey">Blogger API Key</label>
+                            <input type="password" id="bloggerApiKey" name="bloggerApiKey" placeholder="AIza...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="blogId">ブログID</label>
+                            <input type="text" id="blogId" name="blogId" placeholder="1234567890">
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>デフォルト設定</h3>
+                    <form id="defaultSettingsForm">
+                        <div class="form-group">
+                            <label for="defaultCategory">デフォルトカテゴリー</label>
+                            <select id="defaultCategory" name="defaultCategory">
+                                <option value="technology">テクノロジー</option>
+                                <option value="business">ビジネス</option>
+                                <option value="lifestyle">ライフスタイル</option>
+                                <option value="education">教育</option>
+                                <option value="health">健康</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defaultTone">デフォルトトーン</label>
+                            <select id="defaultTone" name="defaultTone">
+                                <option value="professional">プロフェッショナル</option>
+                                <option value="casual">カジュアル</option>
+                                <option value="educational">教育的</option>
+                                <option value="enthusiastic">熱意のある</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defaultLength">デフォルト記事の長さ</label>
+                            <select id="defaultLength" name="defaultLength">
+                                <option value="short">短い（500-800語）</option>
+                                <option value="medium">中程度（800-1500語）</option>
+                                <option value="long">長い（1500-2500語）</option>
+                            </select>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>スケジュール設定</h3>
+                    <form id="scheduleSettingsForm">
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="autoSchedule" name="autoSchedule">
+                                <span>自動スケジューリングを有効化</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="publishFrequency">投稿頻度</label>
+                            <select id="publishFrequency" name="publishFrequency">
+                                <option value="daily">毎日</option>
+                                <option value="weekly">週1回</option>
+                                <option value="biweekly">週2回</option>
+                                <option value="monthly">月1回</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="publishTime">投稿時刻</label>
+                            <input type="time" id="publishTime" name="publishTime" value="10:00">
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>システム情報</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">バージョン</div>
+                            <div class="info-value">1.0.0</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">最終更新</div>
+                            <div class="info-value">2024-01-10</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">データベース</div>
+                            <div class="info-value">SQLite 3.40</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">ストレージ使用量</div>
+                            <div class="info-value">125 MB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="dashboard.js"></script>
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            // Remove active class from all tabs and nav items
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // Add active class to selected tab and nav item
+            document.getElementById(tabName).classList.add('active');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tab = item.dataset.tab;
+                switchTab(tab);
+            });
+        });
+
+        // Form submission
+        function generateArticle(event) {
+            event.preventDefault();
+
+            // Show progress
+            document.getElementById('generationProgress').style.display = 'block';
+            document.getElementById('generationResult').style.display = 'none';
+
+            // Simulate progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                document.getElementById('progressFill').style.width = progress + '%';
+                document.getElementById('progressText').textContent = progress + '%';
+
+                if (progress === 30) {
+                    document.getElementById('progressStatus').textContent = 'トピック分析中...';
+                } else if (progress === 60) {
+                    document.getElementById('progressStatus').textContent = '記事生成中...';
+                } else if (progress === 90) {
+                    document.getElementById('progressStatus').textContent = '最終処理中...';
+                } else if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    document.getElementById('progressStatus').textContent = '完了！';
+
+                    // Show result after delay
+                    setTimeout(() => {
+                        document.getElementById('generationProgress').style.display = 'none';
+                        document.getElementById('generationResult').style.display = 'block';
+
+                        // Sample preview
+                        const topic = document.getElementById('topic').value;
+                        document.getElementById('resultPreview').innerHTML = `
+                            <h3>${topic}</h3>
+                            <p>記事が正常に生成されました。プレビューを確認して、公開または保存してください。</p>
+                            <div class="preview-meta">
+                                <span>文字数: 1,234</span>
+                                <span>推定読了時間: 5分</span>
+                            </div>
+                        `;
+                    }, 500);
+                }
+            }, 300);
+        }
+
+        function resetForm() {
+            document.getElementById('generateForm').reset();
+        }
+
+        function publishArticle() {
+            alert('記事を公開しました！');
+            switchTab('articles');
+        }
+
+        function saveDraft() {
+            alert('下書きとして保存しました！');
+            switchTab('articles');
+        }
+
+        function editArticle() {
+            alert('編集画面に移動します');
+        }
+
+        function filterArticles() {
+            // Implement filtering logic
+            console.log('Filtering articles...');
+        }
+
+        function previousPage() {
+            console.log('Previous page');
+        }
+
+        function nextPage() {
+            console.log('Next page');
+        }
+
+        function previousMonth() {
+            console.log('Previous month');
+        }
+
+        function nextMonth() {
+            console.log('Next month');
+        }
+
+        function refreshDashboard() {
+            location.reload();
+        }
+
+        // Initialize charts
+        window.addEventListener('load', () => {
+            // Trend Chart
+            const trendCtx = document.getElementById('trendChart');
+            if (trendCtx) {
+                new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                        datasets: [{
+                            label: '生成記事数',
+                            data: [12, 19, 15, 25, 22, 30],
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true
+                    }
+                });
+            }
+
+            // Category Chart
+            const categoryCtx = document.getElementById('categoryChart');
+            if (categoryCtx) {
+                new Chart(categoryCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['テクノロジー', 'ビジネス', 'ライフスタイル', '教育', '健康'],
+                        datasets: [{
+                            data: [30, 25, 20, 15, 10],
+                            backgroundColor: [
+                                'rgb(255, 99, 132)',
+                                'rgb(54, 162, 235)',
+                                'rgb(255, 205, 86)',
+                                'rgb(75, 192, 192)',
+                                'rgb(153, 102, 255)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true
+                    }
+                });
+            }
+
+            // Status Chart
+            const statusCtx = document.getElementById('statusChart');
+            if (statusCtx) {
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['公開済み', '下書き', '予約投稿'],
+                        datasets: [{
+                            data: [65, 25, 10],
+                            backgroundColor: [
+                                'rgb(75, 192, 192)',
+                                'rgb(255, 205, 86)',
+                                'rgb(54, 162, 235)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
