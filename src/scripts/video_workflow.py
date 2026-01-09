@@ -126,26 +126,42 @@ class SectionExtractor:
         # YAMLフロントマターを除去（---で囲まれた部分）
         content = self._remove_frontmatter(content)
 
+        # タイトル（# で始まる行）を取得して除去
+        title_match = re.search(r'^#\s+(.+?)$', content, flags=re.MULTILINE)
+        if title_match:
+            content = content[title_match.end():].strip()
+
         # ## で分割
         pattern = r'^##\s+(.+?)$'
         parts = re.split(pattern, content, flags=re.MULTILINE)
 
         # イントロ（最初の##の前）- 実際の内容がある場合のみ
         intro = self._clean_content(parts[0])
-        if intro and len(intro) > 50:  # 50文字以上の実質的な内容がある場合
+        if intro and len(intro) > 30:  # 30文字以上の実質的な内容がある場合
             sections.append({
                 "title": "はじめに",
-                "content": intro[:400]
+                "content": intro[:500]
             })
 
         # セクション
         for i in range(1, len(parts), 2):
             if i + 1 < len(parts):
+                section_title = parts[i].strip()
                 section_content = self._clean_content(parts[i + 1])
-                if section_content:  # 内容がある場合のみ追加
+                if section_content and len(section_content) > 20:  # 内容がある場合のみ追加
                     sections.append({
-                        "title": parts[i].strip(),
-                        "content": section_content[:400]
+                        "title": section_title,
+                        "content": section_content[:500]
+                    })
+
+        # セクションが少ない場合は段落で分割
+        if len(sections) < 3:
+            paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) > 50]
+            for i, para in enumerate(paragraphs[:6]):
+                if para not in [s['content'] for s in sections]:
+                    sections.append({
+                        "title": f"ポイント {i+1}",
+                        "content": self._clean_content(para)[:500]
                     })
 
         return sections[:8]  # 最大8セクション
@@ -153,64 +169,207 @@ class SectionExtractor:
     def _remove_frontmatter(self, content: str) -> str:
         """YAMLフロントマターを除去"""
         # ---で始まり---で終わるフロントマターを除去
-        pattern = r'^---\s*\n.*?\n---\s*\n'
-        content = re.sub(pattern, '', content, flags=re.DOTALL)
+        pattern = r'^---[\s\S]*?---\s*\n?'
+        content = re.sub(pattern, '', content)
         return content.strip()
 
     def _clean_content(self, text: str) -> str:
-        """マークダウン記法を除去"""
-        # 見出し、リンク、強調などを除去
-        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)  # リンク
-        text = re.sub(r'[*_]{1,2}([^*_]+)[*_]{1,2}', r'\1', text)  # 強調
-        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)  # 見出し
-        text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)  # リスト
-        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)  # 画像
-        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)  # コードブロック
-        text = re.sub(r'\n{3,}', '\n\n', text)  # 余分な改行
+        """マークダウン記法を除去して読みやすいテキストに"""
+        if not text:
+            return ""
+
+        # リンク [text](url) → text
+        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+
+        # 強調 **text** → text
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+
+        # イタリック *text* → text
+        text = re.sub(r'\*([^*]+)\*', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+
+        # 見出し ### text → text
+        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+
+        # リスト - item → item
+        text = re.sub(r'^[-*+]\s+', '・', text, flags=re.MULTILINE)
+
+        # 番号付きリスト 1. item → item
+        text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+
+        # 画像 ![alt](url) → 除去
+        text = re.sub(r'!\[.*?\]\([^)]*\)', '', text)
+
+        # コードブロック ```code``` → 除去
+        text = re.sub(r'```[\s\S]*?```', '', text)
+
+        # インラインコード `code` → code
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+
+        # 引用 > text → text
+        text = re.sub(r'^>\s*', '', text, flags=re.MULTILINE)
+
+        # 余分な空白と改行
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)
+
         return text.strip()
+
+
+# ============================================================================
+# Slide Image Generator (using Gemini 2.5 Flash image)
+# ============================================================================
+
+class SlideImageGenerator:
+    """Gemini 2.5 Flash imageでスライド用画像を生成"""
+
+    def __init__(self):
+        self.api_key = os.getenv("GOOGLE_AI_API_KEY")
+
+    async def generate_slide_image(
+        self,
+        title: str,
+        content: str,
+        output_path: Path,
+        index: int = 0
+    ) -> Optional[Path]:
+        """スライド用の画像を生成"""
+        try:
+            from google import genai
+            from google.genai import types
+
+            if not self.api_key:
+                logger.warning("GOOGLE_AI_API_KEY not set, skipping image generation")
+                return None
+
+            client = genai.Client(api_key=self.api_key)
+
+            # プロンプトを作成
+            prompt = f"""Generate a simple, clean illustration for a presentation slide.
+
+Topic: {title}
+Content summary: {content[:200]}
+
+Requirements:
+- Simple, professional illustration style
+- 16:9 landscape format (1920x1080)
+- Clean lines, minimal detail
+- Soft colors matching professional theme
+- NO text, NO words, NO letters in the image
+- Abstract or symbolic representation of the topic
+- Modern, minimalist design suitable for tech/education presentation
+
+Generate a 16:9 LANDSCAPE illustration."""
+
+            logger.info(f"  Generating image for slide {index}: {title[:30]}...")
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-preview-05-20",
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"]
+                )
+            )
+
+            # 画像を保存
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    image_data = part.inline_data.data
+                    output_path.write_bytes(image_data)
+                    logger.info(f"    Saved: {output_path.name}")
+                    return output_path
+
+            logger.warning(f"    No image generated for slide {index}")
+            return None
+
+        except Exception as e:
+            logger.error(f"  Image generation error: {e}")
+            return None
+
+    async def generate_all_images(
+        self,
+        sections: List[Dict],
+        output_dir: Path
+    ) -> List[Optional[Path]]:
+        """全スライドの画像を生成"""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        images = []
+
+        for i, section in enumerate(sections):
+            image_path = output_dir / f"slide_image_{i:02d}.png"
+            result = await self.generate_slide_image(
+                title=section.get("title", f"Slide {i}"),
+                content=section.get("content", ""),
+                output_path=image_path,
+                index=i
+            )
+            images.append(result)
+
+            # レート制限対策
+            if result:
+                await asyncio.sleep(2)
+
+        return images
 
 # ============================================================================
 # Marp Slide Generator
 # ============================================================================
 
 class MarpSlideGenerator:
-    """Marpスライド生成"""
+    """Marpスライド生成（画像挿入対応）"""
 
-    def generate(self, title: str, sections: List[Dict], output_path: Path) -> str:
-        """Marpマークダウンを生成"""
+    def generate(
+        self,
+        title: str,
+        sections: List[Dict],
+        output_path: Path,
+        images: Optional[List[Optional[Path]]] = None
+    ) -> str:
+        """Marpマークダウンを生成（画像付き）"""
         slides = []
 
         # タイトルスライド
         slides.append(f"""---
 marp: true
 theme: default
-paginate: false
+paginate: true
 backgroundColor: #1a1a2e
 color: #ffffff
 style: |
   section {{
     font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    padding: 40px 60px;
   }}
   h1 {{
     color: #00d4ff;
-    font-size: 2.2em;
+    font-size: 2.5em;
     text-align: center;
-    margin-top: 180px;
+    margin-top: 120px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
   }}
   h2 {{
     color: #00d4ff;
     border-bottom: 3px solid #00d4ff;
-    padding-bottom: 10px;
-    font-size: 1.8em;
+    padding-bottom: 15px;
+    font-size: 1.6em;
+    margin-bottom: 30px;
   }}
-  p {{
-    font-size: 1.2em;
-    line-height: 1.6;
+  p, li {{
+    font-size: 1.3em;
+    line-height: 1.8;
+    color: #e0e0e0;
   }}
   ul {{
-    font-size: 1.1em;
-    line-height: 1.8;
+    margin-left: 20px;
+  }}
+  li {{
+    margin-bottom: 15px;
+  }}
+  img {{
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
   }}
 ---
 
@@ -219,13 +378,20 @@ style: |
 """)
 
         # コンテンツスライド
-        for section in sections:
+        for i, section in enumerate(sections):
             # ポイントを抽出
             points = self._extract_points(section["content"])
-            points_md = "\n".join([f"- {p}" for p in points[:4]])
+            points_md = "\n".join([f"- {p}" for p in points])
+
+            # 画像がある場合は右側に配置
+            image_md = ""
+            if images and i < len(images) and images[i]:
+                image_path = images[i]
+                # 相対パスを使用
+                image_md = f"\n![bg right:35%]({image_path.name})\n"
 
             slides.append(f"""---
-
+{image_md}
 ## {section["title"]}
 
 {points_md}
@@ -239,6 +405,8 @@ style: |
 
 **if(塾) Blog**
 
+チャンネル登録・高評価お願いします
+
 詳しくはブログ記事をご覧ください
 
 """)
@@ -248,27 +416,39 @@ style: |
         return markdown
 
     def _extract_points(self, content: str) -> List[str]:
-        """コンテンツからポイントを抽出"""
+        """コンテンツからポイントを抽出（より詳細に）"""
+        if not content:
+            return ["詳しい内容はブログ記事をご覧ください"]
+
+        # 箇条書きがあればそれを使用
+        bullet_points = re.findall(r'・(.+?)(?=・|\n\n|$)', content)
+        if len(bullet_points) >= 2:
+            return [p.strip() for p in bullet_points[:4] if len(p.strip()) > 5]
+
         # 文を分割
-        sentences = re.split(r'[。！？\n]', content)
+        sentences = re.split(r'[。！？]', content)
         points = []
+
         for s in sentences:
             s = s.strip()
-            # 短すぎるものや長すぎるものは除外
-            if len(s) > 15 and len(s) < 80:
-                # 箇条書き記号を除去
-                s = re.sub(r'^[-・•]\s*', '', s)
-                if s:
+            # 適切な長さの文を選択
+            if 10 < len(s) < 100:
+                # 先頭の記号を除去
+                s = re.sub(r'^[・\-\*\d\.]+\s*', '', s)
+                if s and len(s) > 10:
                     points.append(s)
 
-        # ポイントが少ない場合はコンテンツ全体を要約
-        if len(points) < 2 and len(content) > 30:
-            # 最初の100文字を1つのポイントとして使用
-            summary = content[:100].replace('\n', ' ').strip()
-            if summary:
-                points = [summary]
+        # ポイントが少ない場合
+        if len(points) < 2:
+            # コンテンツを複数行に分割
+            lines = [l.strip() for l in content.split('\n') if len(l.strip()) > 15]
+            for line in lines[:4]:
+                if line not in points:
+                    points.append(line[:80])
 
-        return points[:4] if points else ["詳しい内容はブログ記事をご覧ください"]
+        # 最終的なポイントを返す
+        result = points[:4] if points else [content[:100]]
+        return [p for p in result if p]  # 空文字を除外
 
 # ============================================================================
 # Slide Renderer
@@ -528,10 +708,11 @@ class RemotionRenderer:
 # ============================================================================
 
 class VideoWorkflow:
-    """統合動画生成ワークフロー"""
+    """統合動画生成ワークフロー（画像生成対応）"""
 
     def __init__(self):
         self.section_extractor = SectionExtractor()
+        self.slide_image_generator = SlideImageGenerator()
         self.marp_generator = MarpSlideGenerator()
         self.slide_renderer = SlideRenderer()
         self.narration_generator = NarrationGenerator()
@@ -540,7 +721,7 @@ class VideoWorkflow:
         self.remotion_renderer = RemotionRenderer()
 
     async def generate(self, blog_content: str, title: str, topic: str) -> Dict:
-        """ブログ記事から動画を生成"""
+        """ブログ記事から動画を生成（画像生成付き）"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = Path(__file__).parent.parent.parent / "output" / "videos" / f"{timestamp}_{topic}"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -549,6 +730,8 @@ class VideoWorkflow:
         slides_dir.mkdir(exist_ok=True)
         audio_dir = output_dir / "audio"
         audio_dir.mkdir(exist_ok=True)
+        images_dir = output_dir / "images"
+        images_dir.mkdir(exist_ok=True)
 
         try:
             # Step 1: セクション抽出
@@ -556,13 +739,34 @@ class VideoWorkflow:
             sections = self.section_extractor.extract(blog_content)
             logger.info(f"Extracted {len(sections)} sections")
 
-            # Step 2: Marpスライド生成
-            logger.info("Step 2: Generating Marp slides...")
-            marp_path = slides_dir / "slides.md"
-            self.marp_generator.generate(title, sections, marp_path)
+            # デバッグ: 抽出されたセクションを表示
+            for i, sec in enumerate(sections):
+                logger.info(f"  Section {i}: {sec['title'][:30]}... ({len(sec['content'])} chars)")
 
-            # Step 3: PDF → PNG変換
-            logger.info("Step 3: Rendering slides to images...")
+            # Step 2: スライド用画像生成（Gemini 2.5 Flash image）
+            logger.info("Step 2: Generating slide images with Gemini 2.5 Flash...")
+            slide_images_gen = await self.slide_image_generator.generate_all_images(
+                sections, images_dir
+            )
+            # 生成された画像をslidesディレクトリにコピー
+            slide_images_for_marp = []
+            for i, img_path in enumerate(slide_images_gen):
+                if img_path and img_path.exists():
+                    dest_path = slides_dir / img_path.name
+                    shutil.copy(img_path, dest_path)
+                    slide_images_for_marp.append(dest_path)
+                    logger.info(f"  Copied image {i}: {dest_path.name}")
+                else:
+                    slide_images_for_marp.append(None)
+            logger.info(f"Generated {sum(1 for x in slide_images_for_marp if x)} slide images")
+
+            # Step 3: Marpスライド生成（画像付き）
+            logger.info("Step 3: Generating Marp slides with images...")
+            marp_path = slides_dir / "slides.md"
+            self.marp_generator.generate(title, sections, marp_path, slide_images_for_marp)
+
+            # Step 4: PDF → PNG変換
+            logger.info("Step 4: Rendering slides to images...")
             pdf_path = slides_dir / "slides.pdf"
             if not self.slide_renderer.render_to_pdf(marp_path, pdf_path):
                 return {"status": "error", "error": "PDF rendering failed"}
@@ -572,12 +776,12 @@ class VideoWorkflow:
                 return {"status": "error", "error": "PDF to image conversion failed"}
             logger.info(f"Created {len(slide_images)} slide images")
 
-            # Step 4: ナレーションスクリプト生成
-            logger.info("Step 4: Generating narration scripts...")
+            # Step 5: ナレーションスクリプト生成
+            logger.info("Step 5: Generating narration scripts...")
             scripts = await self.narration_generator.generate(title, sections)
 
-            # Step 5: gTTSで音声生成
-            logger.info("Step 5: Generating audio with gTTS...")
+            # Step 6: gTTSで音声生成
+            logger.info("Step 6: Generating audio with gTTS...")
             audio_files = []
             for i, script in enumerate(scripts):
                 audio_path = audio_dir / f"slide_{i:02d}.mp3"
@@ -591,12 +795,12 @@ class VideoWorkflow:
                 logger.info(f"  Slide {i}: {duration:.1f}s")
                 time.sleep(1)  # レート制限対策
 
-            # Step 6: タイミング情報生成
-            logger.info("Step 6: Generating timing information...")
+            # Step 7: タイミング情報生成
+            logger.info("Step 7: Generating timing information...")
             timings = self.timing_generator.generate(audio_files)
 
-            # Step 7: Remotionでレンダリング
-            logger.info("Step 7: Rendering video with Remotion...")
+            # Step 8: ffmpegで動画レンダリング
+            logger.info("Step 8: Rendering video with ffmpeg...")
             video_path = output_dir / f"video_{topic}.mp4"
 
             if not self.remotion_renderer.render(timings, slide_images, video_path):
