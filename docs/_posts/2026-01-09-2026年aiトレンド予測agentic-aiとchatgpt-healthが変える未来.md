@@ -1,8 +1,23 @@
+---
+layout: post
+title: "2026年AIトレンド予測：Agentic AIとChatGPT Healthが変える未来"
+description: "CES 2026で発表された最新AI動向を解説。OpenAIのChatGPT HealthやNVIDIAの次世代GPU、GMO等の国内導入事例から、2026年のAI活用術を専門家が分析します。最新のAIトレンドを今すぐチェック！"
+date: 2026-01-09 10:57:39 +0900
+categories: [AIツール・技術動向]
+tags: [Agentic AI, CES 2026, AI, ChatGPT Health]
+author: "AI Blog Generator"
+featured_image: "/assets/images/2026年aiトレンド予測agentic-aiとchatgpt-healthが変える未来_hero_20260109_105608_0.png"
+---
 # 2026年AIトレンド予測：Agentic AIとChatGPT Healthが変える未来
 
 2026年は、AIが単なる「回答マシン」から、自ら思考し行動する「エージェント」へと進化する重要な転換点となります。本記事では、CES 2026の最新発表や国内企業の成功事例を基に、最新のAI動向を詳しく解説します。
 
 ## 1. CES 2026で示されたAIの新たな地平
+
+<figure class="section-image">
+<img src="{{ '/assets/images/2026年aiトレンド予測agentic-aiとchatgpt-healthが変える未来_section_00_section_1_20260109_105618_0.png' | relative_url }}" alt="1." loading="lazy">
+</figure>
+
 
 2026年1月に開催されたCESでは、AIの進化が「生成（Generative）」から「実行（Agentic）」へとシフトしたことが明確になりました。
 
@@ -14,6 +29,11 @@ Futurum Groupの分析によれば、2026年はAIの「推論（Inference）」�
 
 ## 2. 2026年に押さえるべき3つのAIキーワード
 
+<figure class="section-image">
+<img src="{{ '/assets/images/2026年aiトレンド予測agentic-aiとchatgpt-healthが変える未来_section_01_section_2_20260109_105629_0.png' | relative_url }}" alt="2." loading="lazy">
+</figure>
+
+
 現在のAIトレンドを理解するために、以下の3つの概念を把握しておきましょう。
 
 1. **Agentic AI（自律型AI）**: 意思決定と実行力を持ち、Excel操作やメール送信を自動で行うAI。
@@ -21,6 +41,11 @@ Futurum Groupの分析によれば、2026年はAIの「推論（Inference）」�
 3. **推論ワークロードの拡大**: AIモデルを動かす「推論」の需要が爆発し、より低コストで高速なAI利用が可能に。
 
 ## 3. 主要企業の最新ニュース（2026年1月時点の動向）
+
+<figure class="section-image">
+<img src="{{ '/assets/images/2026年aiトレンド予測agentic-aiとchatgpt-healthが変える未来_section_02_section_3_20260109_105640_0.png' | relative_url }}" alt="3." loading="lazy">
+</figure>
+
 
 ### OpenAI：ChatGPT Healthの衝撃
 OpenAIは医療機関との提携を加速させ、電子カルテ（EHR）やウェアラブルデバイスのデータを解析する「ChatGPT Health」を推進しています。これにより、AIが医師の補助として、あるいは個人の健康アドバイザーとして機能し始めます。
