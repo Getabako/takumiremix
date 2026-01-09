@@ -75,6 +75,8 @@ jobs:
           python -c "import google.genai; print('google-genai: OK')" || echo "google-genai: FAILED"
           python -c "from moviepy.editor import ImageClip; print('moviepy: OK')" || echo "moviepy: FAILED (video generation will be skipped)"
           python -c "from pdf2image import convert_from_path; print('pdf2image: OK')" || echo "pdf2image: FAILED"
+          python -c "from gtts import gTTS; print('gTTS: OK')" || echo "gTTS: FAILED"
+          python -c "from pydub import AudioSegment; print('pydub: OK')" || echo "pydub: FAILED"
 # Removed Remotion setup, but Node.js is needed for Marp
       - name: Setup Node.js for Marp
         if: ${{ github.event.inputs.skip_video != 'true' }}

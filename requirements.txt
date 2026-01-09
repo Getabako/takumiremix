@@ -43,3 +43,7 @@ imageio>=2.31.0
 imageio-ffmpeg>=0.4.8
 decorator>=4.4.2
 pdf2image>=1.16.3
+
+# TTS & Audio (for gTTS-based video generation)
+gTTS>=2.3.0
+pydub>=0.25.1

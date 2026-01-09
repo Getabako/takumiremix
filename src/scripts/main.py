@@ -6,9 +6,9 @@
 1. 情報収集（Google Search: 通常、Deep Research: 日曜のみ）
 2. Gemini 3 Pro (ブログ生成)
 3. Gemini 2.5 Flash (画像生成)
-4. 動画生成（2つのモード）:
-   - 従来モード: Remotion + TTS（30秒概要動画）
-   - スライドモード（推奨）: スライド生成 → Marp PDF → Remotion動画
+4. 動画生成（gTTS + Marp + ffmpeg方式）:
+   - gTTS音声生成 → Marpスライド → ffmpeg動画合成
+   - YouTube風字幕付き解説動画を自動生成
 5. SEO最適化 & レビュー
 6. 品質評価（95%合格ライン）
 7. GitHub Pages投稿
@@ -16,7 +16,7 @@
 設計方針:
 - Google Search Tool: 日常的な情報収集（メイン・デフォルト）
 - Deep Research: 週1回（日曜日）の深層調査
-- スライドベース動画: 高品質な解説動画を自動生成（推奨）
+- gTTS動画生成: 無料のTTSでGitHub Actionsでも動作
 """
 import asyncio
 import argparse
@@ -142,25 +142,25 @@ async def main():
             logger.info("Step 3: Skipping image generation")
             result["steps"]["images"] = {"status": "skipped"}
 
-        # Step 4: 動画生成（VOICEPEAK + Marp方式）
+        # Step 4: 動画生成（gTTS + Marp + ffmpeg方式）
         videos = {"status": "skipped"}
         slides_data = None
         if not args.skip_video:
             logger.info("=" * 50)
-            logger.info("Step 4: Generating video (VOICEPEAK + Marp)...")
+            logger.info("Step 4: Generating video (gTTS + Marp + ffmpeg)...")
             logger.info("=" * 50)
 
             try:
-                # 新しいVOICEPEAK動画生成システム
-                from video_generator_voicepeak import BlogVideoGenerator
+                # gTTSベース動画生成ワークフロー
+                from video_workflow import VideoWorkflow
 
-                video_gen = BlogVideoGenerator()
+                workflow = VideoWorkflow()
 
                 # ブログ記事の内容から動画を生成
                 blog_content = article.get("content", "")
                 blog_title = article.get("title", args.topic)
 
-                video_result = await video_gen.generate(
+                video_result = await workflow.generate(
                     blog_content=blog_content,
                     title=blog_title,
                     topic=args.topic
