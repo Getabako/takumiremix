@@ -127,6 +127,68 @@ class GitHubPagesPublisher:
         # Jekyll用の相対パス（relative_urlフィルタで変換されるためbaseurl不要）
         return f"/assets/images/{filename}"
 
+    def copy_section_images(self, article: Dict, slug: str) -> List[Dict]:
+        """セクション画像をコピーして情報を返す"""
+        images = article.get("images", {})
+        section_images = images.get("sections", [])
+        copied_sections = []
+
+        for i, section_data in enumerate(section_images):
+            section_imgs = section_data.get("images", [])
+            if not section_imgs:
+                continue
+
+            first_img = section_imgs[0]
+            src_path = Path(first_img.get("file_path", ""))
+
+            if not src_path.exists():
+                logger.warning(f"Section image not found: {src_path}")
+                continue
+
+            # 画像サイズ検証
+            file_size = src_path.stat().st_size
+            if file_size < 10 * 1024:  # 10KB
+                logger.warning(f"Section image too small: {src_path}")
+                continue
+
+            # コピー
+            filename = f"{slug}_section_{i:02d}_{src_path.name}"
+            dest_path = self.images_dir / filename
+            shutil.copy(src_path, dest_path)
+
+            copied_sections.append({
+                "index": i,
+                "title": section_data.get("title", f"Section {i+1}"),
+                "path": f"/assets/images/{filename}"
+            })
+            logger.info(f"Copied section image {i}: {dest_path}")
+
+        return copied_sections
+
+    def embed_section_images(self, content: str, section_images: List[Dict]) -> str:
+        """セクション画像をコンテンツに埋め込む"""
+        if not section_images:
+            return content
+
+        # 各セクションヘッダー(##)の後に画像を挿入
+        lines = content.split('\n')
+        result_lines = []
+        section_idx = 0
+
+        for line in lines:
+            result_lines.append(line)
+
+            # h2ヘッダーを検出
+            if line.startswith('## ') and section_idx < len(section_images):
+                section = section_images[section_idx]
+                img_path = section["path"]
+                # ヘッダーの次の行に画像を挿入
+                img_html = f'\n<figure class="section-image">\n<img src="{{{{ \'{img_path}\' | relative_url }}}}" alt="{section["title"]}" loading="lazy">\n</figure>\n'
+                result_lines.append(img_html)
+                section_idx += 1
+
+        return '\n'.join(result_lines)
+
     def find_existing_videos(self, topic: str = None) -> Optional[Dict]:
         """
         output/videos/から既存の動画を探す（フォールバック用）
@@ -384,6 +446,12 @@ async def publish_to_github_pages(article: Dict) -> Dict:
         # 画像コピー
         slug = publisher.slugify(title)
         featured_image = publisher.copy_images(article, slug)
+
+        # セクション画像をコピーして埋め込む
+        section_images = publisher.copy_section_images(article, slug)
+        if section_images:
+            content = publisher.embed_section_images(content, section_images)
+            logger.info(f"Section images embedded: {len(section_images)}")
 
         # 動画コピー
         copied_videos = publisher.copy_videos(article, slug)

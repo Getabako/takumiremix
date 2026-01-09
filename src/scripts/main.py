@@ -71,13 +71,11 @@ async def main():
     from research import run_research
     from generate_content import generate_article
     from generate_image import generate_images
-    from generate_video import generate_video
-    from generate_slide_video import generate_slide_video
-    from generate_video_v3 import VideoGeneratorV3  # SlideMovie_WorkFlow方式の動画生成
     from seo_optimize import optimize_seo
     from review import review_article
     from publish import publish_to_github_pages
     from quality_evaluator import QualityEvaluator
+    # Note: video_generator_voicepeak is imported dynamically in Step 4
 
     result = {
         "topic": args.topic,
@@ -109,106 +107,93 @@ async def main():
         }
         logger.info(f"Content generated. Word count: {article.get('word_count', 0)}")
 
-        # Step 3: Gemini 2.5 Flash (画像生成)
+        # Step 3: Gemini 2.5 Flash (画像生成 - ヒーロー + セクション)
         images = {"status": "skipped"}
         if not args.skip_images:
             logger.info("=" * 50)
             logger.info("Step 3: Generating images with Gemini 2.5 Flash...")
             logger.info("=" * 50)
-            images = await generate_images(article)
+
+            # セクションを抽出してarticleに追加
+            content = article.get("content", "")
+            sections = []
+            import re
+            pattern = r'^##\s+(.+?)$'
+            parts = re.split(pattern, content, flags=re.MULTILINE)
+            for i in range(1, len(parts), 2):
+                if i + 1 < len(parts):
+                    sections.append({
+                        "title": parts[i].strip(),
+                        "content": parts[i + 1].strip()[:300]
+                    })
+
+            # セクション情報を追加
+            article_with_sections = {**article, "sections": sections}
+            logger.info(f"Extracted {len(sections)} sections for image generation")
+
+            images = await generate_images(article_with_sections, topic_id=args.topic)
             result["steps"]["images"] = {
                 "status": images.get("status", "error"),
-                "total_images": images.get("total_images", 0)
+                "total_images": images.get("total_images", 0),
+                "section_images": len(images.get("sections", []))
             }
-            logger.info(f"Images generated: {images.get('total_images', 0)}")
+            logger.info(f"Images generated: {images.get('total_images', 0)} (hero + {len(images.get('sections', []))} sections)")
         else:
             logger.info("Step 3: Skipping image generation")
             result["steps"]["images"] = {"status": "skipped"}
 
-        # Step 4: 動画生成（スライドベースまたは従来モード）
+        # Step 4: 動画生成（VOICEPEAK + Marp方式）
         videos = {"status": "skipped"}
         slides_data = None
         if not args.skip_video:
             logger.info("=" * 50)
-            video_mode = "Slide-based" if args.use_slide_video else "Traditional"
-            logger.info(f"Step 4: Generating video ({video_mode} mode)...")
+            logger.info("Step 4: Generating video (VOICEPEAK + Marp)...")
             logger.info("=" * 50)
 
-            if args.use_slide_video:
-                # 新ワークフローV3: SlideMovie_WorkFlow方式（音声同期・タイミングベース）
-                logger.info(f"  - Target slides: {args.slide_count}")
-                logger.info(f"  - Using Video Generator V3 (SlideMovie_WorkFlow style)")
+            try:
+                # 新しいVOICEPEAK動画生成システム
+                from video_generator_voicepeak import BlogVideoGenerator
 
-                # トピック情報を取得
-                import json
-                topics_path = Path(__file__).parent.parent / "config" / "topics.json"
-                with open(topics_path, 'r', encoding='utf-8') as f:
-                    topics_config = json.load(f)
-                # topicsはリストなので、idでフィルタリング
-                topics_list = topics_config.get("topics", [])
-                topic_info = next((t for t in topics_list if t.get("id") == args.topic), {})
+                video_gen = BlogVideoGenerator()
 
-                # リサーチデータから動画を生成（ブログ記事とは別）
-                video_gen = VideoGeneratorV3()
-                slide_video_result = await video_gen.generate(
-                    research_data=research_data.get("content", ""),
-                    topic=args.topic,
-                    topic_info=topic_info,
-                    num_slides=args.slide_count
+                # ブログ記事の内容から動画を生成
+                blog_content = article.get("content", "")
+                blog_title = article.get("title", args.topic)
+
+                video_result = await video_gen.generate(
+                    blog_content=blog_content,
+                    title=blog_title,
+                    topic=args.topic
                 )
 
-                slides_data = {"slide_count": slide_video_result.get("slides_count", 0)}
-                videos = {
-                    "status": slide_video_result.get("status", "error"),
-                    "videos": {"standard": {
-                        "path": slide_video_result.get("video_path"),
-                        "duration": slide_video_result.get("duration", 0)
-                    }},
-                    "title": slide_video_result.get("title", "")
-                }
+                if video_result.get("status") == "success":
+                    videos = {
+                        "status": "success",
+                        "videos": {"standard": {
+                            "path": video_result.get("video_path"),
+                            "duration": video_result.get("duration", 0)
+                        }},
+                        "title": video_result.get("title", "")
+                    }
+                    result["steps"]["videos"] = videos
+                    result["steps"]["slides"] = {
+                        "status": "completed",
+                        "slide_count": video_result.get("slides_count", 0)
+                    }
+                    logger.info(f"Video generated! Duration: {video_result.get('duration', 0):.1f}s, Slides: {video_result.get('slides_count', 0)}")
+                else:
+                    videos = {"status": "error", "error": video_result.get("error", "Unknown")}
+                    result["steps"]["videos"] = videos
+                    logger.warning(f"Video generation failed: {video_result.get('error', 'Unknown')}")
+
+            except ImportError as e:
+                logger.warning(f"Video generator import error: {e}")
+                videos = {"status": "skipped", "error": str(e)}
                 result["steps"]["videos"] = videos
-                result["steps"]["slides"] = {
-                    "status": "completed" if slide_video_result.get("status") == "success" else "error",
-                    "slide_count": slide_video_result.get("slides_count", 0)
-                }
-
-                if slide_video_result.get("status") == "success":
-                    video_duration = slide_video_result.get("duration", 0)
-                    logger.info(f"Video V3 generated! Duration: {video_duration:.1f}s, Slides: {slide_video_result.get('slides_count', 0)}")
-                else:
-                    logger.warning(f"Video V3 generation issue: {slide_video_result.get('error', 'Unknown')}")
-            else:
-                # 従来ワークフロー: Remotion + TTS
-                # ヒーロー画像パスを取得（動画に統合）
-                hero_image_path = None
-                if images.get("status") == "success" and images.get("hero"):
-                    hero_images = images.get("hero", {}).get("images", [])
-                    if hero_images:
-                        first_image = hero_images[0]
-                        if isinstance(first_image, dict):
-                            hero_image_path = first_image.get("file_path")
-                        else:
-                            hero_image_path = first_image
-                        logger.info(f"Hero image for video: {hero_image_path}")
-
-                video_article = {**article, "hero_image_path": hero_image_path}
-
-                videos = await generate_video(
-                    article=video_article,
-                    generate_short=False,
-                    generate_audio=True
-                )
-                result["steps"]["videos"] = {
-                    "status": videos.get("status", "error"),
-                    "videos": videos.get("videos", {}),
-                    "narration": videos.get("narration", {})
-                }
-
-                if videos.get("status") == "success":
-                    has_audio = videos.get("videos", {}).get("standard", {}).get("has_audio", False)
-                    logger.info(f"Video generated: standard (with audio: {has_audio})")
-                else:
-                    logger.warning(f"Video generation failed: {videos.get('error', 'Unknown error')}")
+            except Exception as e:
+                logger.warning(f"Video generation error: {e}")
+                videos = {"status": "error", "error": str(e)}
+                result["steps"]["videos"] = videos
         else:
             logger.info("Step 4: Skipping video generation")
             result["steps"]["videos"] = {"status": "skipped"}
