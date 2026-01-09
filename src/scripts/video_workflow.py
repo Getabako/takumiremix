@@ -569,51 +569,92 @@ class VideoWorkflow:
                         output_dir: Path, topic: str) -> Optional[Path]:
         """ffmpegを使ったシンプルなフォールバックレンダリング"""
         try:
+            # ffmpegの存在確認
+            ffmpeg_check = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True)
+            if ffmpeg_check.returncode != 0:
+                logger.error("ffmpeg not found in PATH")
+                return None
+            logger.info(f"ffmpeg found: {ffmpeg_check.stdout.strip()}")
+
             video_path = output_dir / f"video_{topic}.mp4"
             concat_file = output_dir / "concat.txt"
 
             # 各スライドを動画に変換して結合
             temp_videos = []
+            logger.info(f"Creating {len(slide_images)} slide videos...")
+
+            for i, (img, audio_info) in enumerate(zip(slide_images, audio_files)):
+                temp_video = output_dir / f"temp_{i:02d}.mp4"
+                duration = audio_info["duration"]
+                audio_path = audio_info["audio_file"]
+
+                logger.info(f"  Processing slide {i}: {img.name}, audio: {audio_path}, duration: {duration:.1f}s")
+
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-loop", "1", "-i", str(img),
+                    "-i", str(audio_path),
+                    "-c:v", "libx264", "-tune", "stillimage",
+                    "-c:a", "aac", "-b:a", "192k",
+                    "-pix_fmt", "yuv420p",
+                    "-shortest",
+                    "-t", str(duration),
+                    str(temp_video)
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+
+                if result.returncode != 0:
+                    logger.error(f"  ffmpeg error for slide {i}: {result.stderr[:500]}")
+                    continue
+
+                if temp_video.exists():
+                    temp_videos.append(temp_video)
+                    logger.info(f"  Created: {temp_video.name}")
+                else:
+                    logger.error(f"  Temp video not created: {temp_video}")
+
+            if not temp_videos:
+                logger.error("No temp videos were created")
+                return None
+
+            # concat.txtを作成
             with open(concat_file, 'w') as f:
-                for i, (img, audio_info) in enumerate(zip(slide_images, audio_files)):
-                    temp_video = output_dir / f"temp_{i:02d}.mp4"
-                    duration = audio_info["duration"]
-                    audio_path = audio_info["audio_file"]
-
-                    cmd = [
-                        "ffmpeg", "-y",
-                        "-loop", "1", "-i", str(img),
-                        "-i", str(audio_path),
-                        "-c:v", "libx264", "-tune", "stillimage",
-                        "-c:a", "aac", "-b:a", "192k",
-                        "-pix_fmt", "yuv420p",
-                        "-t", str(duration),
-                        str(temp_video)
-                    ]
-                    subprocess.run(cmd, capture_output=True)
-
-                    if temp_video.exists():
-                        f.write(f"file '{temp_video.name}'\n")
-                        temp_videos.append(temp_video)
+                for tv in temp_videos:
+                    f.write(f"file '{tv.name}'\n")
+            logger.info(f"Created concat file with {len(temp_videos)} videos")
 
             # 結合
+            logger.info("Concatenating videos...")
             concat_cmd = [
                 "ffmpeg", "-y", "-f", "concat", "-safe", "0",
                 "-i", str(concat_file),
                 "-c", "copy",
                 str(video_path)
             ]
-            subprocess.run(concat_cmd, capture_output=True)
+            result = subprocess.run(concat_cmd, capture_output=True, text=True, cwd=str(output_dir))
+
+            if result.returncode != 0:
+                logger.error(f"Concat error: {result.stderr[:500]}")
 
             # 一時ファイル削除
             for tv in temp_videos:
-                tv.unlink()
-            concat_file.unlink()
+                if tv.exists():
+                    tv.unlink()
+            if concat_file.exists():
+                concat_file.unlink()
 
-            return video_path if video_path.exists() else None
+            if video_path.exists():
+                file_size = video_path.stat().st_size / (1024 * 1024)
+                logger.info(f"Video created: {video_path} ({file_size:.1f} MB)")
+                return video_path
+            else:
+                logger.error("Final video file not created")
+                return None
 
         except Exception as e:
             logger.error(f"Fallback render error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
 # ============================================================================
