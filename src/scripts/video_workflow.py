@@ -123,26 +123,39 @@ class SectionExtractor:
         """h2セクションを抽出"""
         sections = []
 
+        # YAMLフロントマターを除去（---で囲まれた部分）
+        content = self._remove_frontmatter(content)
+
         # ## で分割
         pattern = r'^##\s+(.+?)$'
         parts = re.split(pattern, content, flags=re.MULTILINE)
 
-        # イントロ（最初の##の前）
-        if parts[0].strip():
+        # イントロ（最初の##の前）- 実際の内容がある場合のみ
+        intro = self._clean_content(parts[0])
+        if intro and len(intro) > 50:  # 50文字以上の実質的な内容がある場合
             sections.append({
                 "title": "はじめに",
-                "content": self._clean_content(parts[0])[:400]
+                "content": intro[:400]
             })
 
         # セクション
         for i in range(1, len(parts), 2):
             if i + 1 < len(parts):
-                sections.append({
-                    "title": parts[i].strip(),
-                    "content": self._clean_content(parts[i + 1])[:400]
-                })
+                section_content = self._clean_content(parts[i + 1])
+                if section_content:  # 内容がある場合のみ追加
+                    sections.append({
+                        "title": parts[i].strip(),
+                        "content": section_content[:400]
+                    })
 
         return sections[:8]  # 最大8セクション
+
+    def _remove_frontmatter(self, content: str) -> str:
+        """YAMLフロントマターを除去"""
+        # ---で始まり---で終わるフロントマターを除去
+        pattern = r'^---\s*\n.*?\n---\s*\n'
+        content = re.sub(pattern, '', content, flags=re.DOTALL)
+        return content.strip()
 
     def _clean_content(self, text: str) -> str:
         """マークダウン記法を除去"""
@@ -151,6 +164,9 @@ class SectionExtractor:
         text = re.sub(r'[*_]{1,2}([^*_]+)[*_]{1,2}', r'\1', text)  # 強調
         text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)  # 見出し
         text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)  # リスト
+        text = re.sub(r'!\[.*?\]\(.*?\)', '', text)  # 画像
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)  # コードブロック
+        text = re.sub(r'\n{3,}', '\n\n', text)  # 余分な改行
         return text.strip()
 
 # ============================================================================
@@ -238,9 +254,21 @@ style: |
         points = []
         for s in sentences:
             s = s.strip()
-            if len(s) > 10 and len(s) < 60:
-                points.append(s)
-        return points[:4] if points else ["詳細はブログで"]
+            # 短すぎるものや長すぎるものは除外
+            if len(s) > 15 and len(s) < 80:
+                # 箇条書き記号を除去
+                s = re.sub(r'^[-・•]\s*', '', s)
+                if s:
+                    points.append(s)
+
+        # ポイントが少ない場合はコンテンツ全体を要約
+        if len(points) < 2 and len(content) > 30:
+            # 最初の100文字を1つのポイントとして使用
+            summary = content[:100].replace('\n', ' ').strip()
+            if summary:
+                points = [summary]
+
+        return points[:4] if points else ["詳しい内容はブログ記事をご覧ください"]
 
 # ============================================================================
 # Slide Renderer
@@ -260,18 +288,47 @@ class SlideRenderer:
             return False
 
     def pdf_to_images(self, pdf_path: Path, output_dir: Path) -> List[Path]:
-        """PDF → PNG"""
+        """PDF → PNG (1920x1080 for video)"""
         try:
             from pdf2image import convert_from_path
-            images = convert_from_path(str(pdf_path), dpi=150)
+            from PIL import Image
+
+            # 高解像度で変換（16:9アスペクト比用）
+            images = convert_from_path(str(pdf_path), dpi=200)
             paths = []
             for i, img in enumerate(images):
                 out = output_dir / f"slide_{i:02d}.png"
-                img.save(str(out), "PNG")
+
+                # 1920x1080にリサイズ（アスペクト比を維持しながらフィット）
+                target_size = (1920, 1080)
+                img_ratio = img.width / img.height
+                target_ratio = 1920 / 1080
+
+                if img_ratio > target_ratio:
+                    # 横長 - 幅に合わせる
+                    new_width = 1920
+                    new_height = int(1920 / img_ratio)
+                else:
+                    # 縦長 - 高さに合わせる
+                    new_height = 1080
+                    new_width = int(1080 * img_ratio)
+
+                img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                # 1920x1080のキャンバスに中央配置
+                canvas = Image.new('RGB', target_size, (26, 26, 46))  # #1a1a2e
+                x = (1920 - new_width) // 2
+                y = (1080 - new_height) // 2
+                canvas.paste(img_resized, (x, y))
+                canvas.save(str(out), "PNG", quality=95)
                 paths.append(out)
+                logger.info(f"  Slide {i}: {out.name} (1920x1080)")
+
             return paths
         except Exception as e:
             logger.error(f"PDF to image error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
 # ============================================================================
@@ -590,14 +647,22 @@ class VideoWorkflow:
 
                 logger.info(f"  Processing slide {i}: {img.name}, audio: {audio_path}, duration: {duration:.1f}s")
 
+                # 画像を1920x1080にリサイズしてエンコード
                 cmd = [
                     "ffmpeg", "-y",
-                    "-loop", "1", "-i", str(img),
+                    "-loop", "1",
+                    "-framerate", "30",
+                    "-i", str(img),
                     "-i", str(audio_path),
-                    "-c:v", "libx264", "-tune", "stillimage",
-                    "-c:a", "aac", "-b:a", "192k",
+                    "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black",
+                    "-c:v", "libx264",
+                    "-preset", "medium",
+                    "-crf", "23",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-ar", "44100",
                     "-pix_fmt", "yuv420p",
-                    "-shortest",
+                    "-movflags", "+faststart",
                     "-t", str(duration),
                     str(temp_video)
                 ]
