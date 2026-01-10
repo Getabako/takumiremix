@@ -123,8 +123,12 @@ class SectionExtractor:
         """h2セクションを抽出"""
         sections = []
 
+        # デバッグ: 入力の最初の200文字を表示
+        logger.info(f"Input content (first 200 chars): {content[:200]}...")
+
         # YAMLフロントマターを除去（---で囲まれた部分）
         content = self._remove_frontmatter(content)
+        logger.info(f"After frontmatter removal (first 200 chars): {content[:200]}...")
 
         # タイトル（# で始まる行）を取得して除去
         title_match = re.search(r'^#\s+(.+?)$', content, flags=re.MULTILINE)
@@ -265,7 +269,7 @@ Generate a 16:9 LANDSCAPE illustration."""
             logger.info(f"  Generating image for slide {index}: {title[:30]}...")
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash-preview-05-20",
+                model="gemini-2.5-flash-image",
                 contents=[prompt],
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"]
@@ -383,12 +387,14 @@ style: |
             points = self._extract_points(section["content"])
             points_md = "\n".join([f"- {p}" for p in points])
 
-            # 画像がある場合は右側に配置
+            # 画像がある場合は右側に配置（絶対パスを使用）
             image_md = ""
             if images and i < len(images) and images[i]:
                 image_path = images[i]
-                # 相対パスを使用
-                image_md = f"\n![bg right:35%]({image_path.name})\n"
+                # 絶対パスを使用（Marpは--allow-local-filesで絶対パス対応）
+                abs_path = str(image_path.resolve())
+                image_md = f"\n![bg right:40%]({abs_path})\n"
+                logger.info(f"  Slide {i+1} image: {abs_path}")
 
             slides.append(f"""---
 {image_md}
@@ -461,10 +467,20 @@ class SlideRenderer:
         """Marp → PDF"""
         try:
             cmd = ["marp", str(marp_path), "--pdf", "--allow-local-files", "-o", str(output_path)]
+            logger.info(f"Running Marp: {' '.join(cmd)}")
             result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode != 0:
+                logger.error(f"Marp error (return code {result.returncode}): {result.stderr}")
+                logger.error(f"Marp stdout: {result.stdout}")
+            else:
+                logger.info(f"Marp PDF created: {output_path}")
+
             return output_path.exists()
         except Exception as e:
             logger.error(f"PDF render error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def pdf_to_images(self, pdf_path: Path, output_dir: Path) -> List[Path]:
